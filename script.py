@@ -63,7 +63,7 @@ def read_process(pid):
             for ext, magic_nums in file_exts.items():
                 if file_type in magic_nums:
                     output_file_name = f"{pid}.{ext}"
-                    with open(os.path.expandvars(f"%USERPROFILE\\Documents\\{output_file_name}"), "wb") as export_file:
+                    with open(os.path.expandvars(f"C:\\OutlookAttachments\\{output_file_name}"), "wb") as export_file:
                         export_file.write(data)
                     print(f"Extraction successful: {output_file_name}")
                     break
