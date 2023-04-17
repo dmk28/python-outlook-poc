@@ -13,6 +13,9 @@ import time
 #this purports to extract such files from the byte array in volatile memory and save them to disk just to show how this could be done
 
 ## the 
+
+global hasRun 
+hasRun = False
 outlook = win32com.client.Dispatch("Outlook.Application")
 
 file_exts = {
@@ -24,12 +27,13 @@ file_exts = {
 
 
 def check_for_outlook():
+    global hasRun
     for proc in psutil.process_iter(['pid', 'name']):
         try:
             if proc.name().lower() == 'outlook.exe':
                 pid = proc.pid
                 read_process(pid)
-                
+                hasRun = True
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             print("OK, not reading process")
             pass
@@ -50,6 +54,7 @@ def read_process(pid):
             try:
                 data = region.read()
             except (psutil.AccessDenied, psutil.ZombieProcess):
+                print("Access denied by system")
                 continue
 
             # It checks if the data is an Office file and saves it in the Documents folder. I intend to open a Save As... window soon.
@@ -65,11 +70,13 @@ def read_process(pid):
 
 
 def main():
-    check_for_memory_transaction = False
-    while not check_for_memory_transaction:
+    
+    while not hasRun:
         check_for_outlook()
         time.sleep(10)
-    time.sleep(10000)
+    
+           
+
 
 
 if __name__ == "__main__":
