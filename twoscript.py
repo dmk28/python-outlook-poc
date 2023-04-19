@@ -85,6 +85,7 @@ def read_process(pid):
                     scan_bytes = pymem.memory.read_bytes(address=search_result, handle=handle, byte=len(p))
                     print("Pattern found, let's proceed")
                     file_extraction(handle, base_address)
+                    return "OK"
                     
 
                 
@@ -113,7 +114,9 @@ def file_extraction(handle, process_address):
             os.fsync(f.fileno())
             with open(f.name, 'rb') as f2:
                 file_data = f2.read()
+                print("Saving file...")
         save_file_dialog(file_data=file_data)
+        return "OK"
     except pymem.exception.MemoryReadError:
         print("Exception found: MemoryReadError")
 
@@ -127,6 +130,7 @@ def save_file_dialog(file_data):
         with open(file_path, 'wb') as f:
             f.write(file_data)
     root.quit()
+    root.destroy()
 def test_run():
     outlook = win32.Dispatch("Outlook.Application")
     inbox = outlook.GetNameSpace("MAPI").GetDefaultFolder(6)
@@ -136,4 +140,5 @@ def test_run():
 
 if __name__ == '__main__':
    check_for_outlook()
+  
 
